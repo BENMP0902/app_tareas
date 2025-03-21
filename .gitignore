@@ -1,0 +1,3 @@
+# Ignorar carpetas de configuración y caché
+.vscode/
+__pycache__/

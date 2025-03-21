@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Perfil de {{ nombre }}</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        width: 80%;
+        max-width: 800px;
+      }
+      h1 { color: #333; }
+      .logout-btn {
+        display: inline-block;
+        margin-top: 20px;
+        padding: 10px 20px;
+        text-decoration: none;
+        color: white;
+        background-color: #d9534f;
+        border-radius: 5px;
+        transition: background 0.3s;
+      }
+      .logout-btn:hover { background-color: #c9302c; }
+      button {
+        margin-top: 10px;
+        padding: 10px;
+        background-color: #5cb85c;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      button:hover { background-color: #4cae4c; }
+      table {
+        width: 100%;
+        margin-top: 20px;
+        border-collapse: collapse;
+      }
+      th, td {
+        border: 1px solid #ccc;
+        padding: 10px;
+        text-align: center;
+      }
+      th { background-color: #f0f0f0; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>¡Hola, {{ nombre }}!</h1>
+      <p>Bienvenido a tu perfil. Aquí puedes gestionar tus tareas.</p>
+      <a href="logout" class="logout-btn">Cerrar sesión</a>
+      <button onclick="agregarPendiente()">Agregar nuevo pendiente</button>
+
+      <h3>Pendientes</h3>
+      <table id="pendientes">
+        <tr>
+          <th>Nombre</th>
+          <th>Descripción</th>
+          <th>Acciones</th>
+        </tr>
+        {% for tarea in tareas if tarea.status == 'pendiente' %}
+        <tr data-tarea-id="{{ tarea.id }}">
+          <td>{{ tarea.name }}</td>
+          <td>{{ tarea.description }}</td>
+          <td>
+            <button onclick="actualizarEstado(this, 'en proceso')">Mover a "En Proceso"</button>
+            <button onclick="eliminarTarea(this)">Eliminar</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+
+      <h3>En proceso</h3>
+      <table id="enProceso">
+        <tr>
+          <th>Nombre</th>
+          <th>Descripción</th>
+          <th>Acciones</th>
+        </tr>
+        {% for tarea in tareas if tarea.status == 'en proceso' %}
+        <tr data-tarea-id="{{ tarea.id }}">
+          <td>{{ tarea.name }}</td>
+          <td>{{ tarea.description }}</td>
+          <td>
+            <button onclick="actualizarEstado(this, 'completada')">Mover a "Finalizado"</button>
+            <button onclick="eliminarTarea(this)">Eliminar</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+
+      <h3>Finalizado</h3>
+      <table id="finalizado">
+        <tr>
+          <th>Nombre</th>
+          <th>Descripción</th>
+          <th>Acciones</th>
+        </tr>
+        {% for tarea in tareas if tarea.status == 'completada' %}
+        <tr data-tarea-id="{{ tarea.id }}">
+          <td>{{ tarea.name }}</td>
+          <td>{{ tarea.description }}</td>
+          <td>
+            <button onclick="eliminarTarea(this)">Eliminar</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <script>
+    function getCSRFToken() {
+        const cookies = document.cookie.split('; ');
+        const csrfCookie = cookies.find(row => row.startsWith('csrf_access_token='));
+        if (!csrfCookie) {
+            alert('Error: Token CSRF no encontrado');
+            return null;
+        }
+        return csrfCookie.split('=')[1];
+    }
+
+        function actualizarEstado(event, nuevoEstado) {
+        const row = event.target.closest('tr');
+        const tareaId = row.getAttribute('data-tarea-id');
+
+        fetch(`/actualizar_tarea/${tareaId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': getCSRFToken()
+            },
+            body: JSON.stringify({ nuevo_estado: nuevoEstado })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error en la solicitud');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'ok') {
+                location.reload();  // Recargar la página para reflejar los cambios
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Hubo un error al actualizar la tarea.');
+        });
+    }
+
+    function eliminarTarea(event) {
+        const row = event.target.closest('tr');
+        const tareaId = row.getAttribute('data-tarea-id');
+
+        fetch(`/eliminar_tarea/${tareaId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRF-TOKEN': getCSRFToken()
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error en la solicitud');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'ok') {
+                row.remove();  // Eliminar la fila de la tabla
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Hubo un error al eliminar la tarea.');
+        });
+    }
+    function agregarPendiente() {
+        const nombre = prompt('Ingrese el nombre de la tarea:');
+        const descripcion = prompt('Ingrese la descripción de la tarea:');
+
+        if (nombre && descripcion) {
+            fetch('/crear_tarea', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': getCSRFToken()
+                },
+                body: JSON.stringify({ name: nombre, descripcion: descripcion })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Error en la solicitud');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'ok') {
+                    location.reload();  // Recargar la página para reflejar los cambios
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Hubo un error al crear la tarea.');
+            });
+        }
+    }
+  </script>
+</body>
+</html>
